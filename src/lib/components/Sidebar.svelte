@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Bars3Icon } from 'heroicons/24/outline';
+  import { Menu } from 'lucide-svelte';
   import { sidebarWidth } from '$lib/stores/ui';
 
   const toggle = () => sidebarWidth.update(w => (w === 0 ? 256 : 0));
@@ -13,7 +13,7 @@
   <header class="flex items-center justify-between p-3 border-b">
     <span class="font-bold text-sm">Nexus Tree</span>
     <button on:click={toggle} class="lg:hidden">
-      <Bars3Icon class="h-5 w-5" />
+      <Menu class="h-5 w-5" />
     </button>
   </header>
 

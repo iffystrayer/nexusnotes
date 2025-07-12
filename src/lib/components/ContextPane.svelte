@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { SunIcon, MoonIcon } from 'heroicons/24/outline';
+  import { Sun, Moon } from 'lucide-svelte';
   import { toggleTheme } from '$lib/stores/theme';
 </script>
 
@@ -7,7 +7,7 @@
   <header class="flex items-center justify-between p-3 border-b">
     <span class="font-semibold text-sm">Context</span>
     <button on:click={toggleTheme} class="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700">
-      <SunIcon class="h-5 w-5 dark:hidden" /> <MoonIcon class="h-5 w-5 hidden dark:block" />
+      <Sun class="h-5 w-5 dark:hidden" /> <Moon class="h-5 w-5 hidden dark:block" />
     </button>
   </header>
   <div class="flex-1 p-3 text-sm text-gray-600 dark:text-gray-400">Backlinks & suggestions will appear here.</div>

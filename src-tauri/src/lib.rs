@@ -10,7 +10,9 @@ fn greet(name: &str) -> String {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::async_runtime::spawn(async {
-        db::init_db().await.unwrap();
+        if let Err(e) = db::init_db().await {
+            eprintln!("Failed to initialize database: {}", e);
+        }
     });
 
     tauri::Builder::default()
