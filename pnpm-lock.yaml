@@ -48,6 +48,9 @@ importers:
       svelte-check:
         specifier: ^4.0.0
         version: 4.2.2(picomatch@4.0.2)(svelte@5.35.6)(typescript@5.6.3)
+      svelte-splitpanes:
+        specifier: ^8.0.9
+        version: 8.0.9(svelte@5.35.6)
       tailwindcss:
         specifier: ^4.1.11
         version: 4.1.11
@@ -639,6 +642,9 @@ packages:
     resolution: {integrity: sha512-WUj2qlxaQtO4g6Pq5c29GTcWGDyd8itL8zTlipgECz3JesAiiOKotd8JU6otB3PACgG6xkJUyVhboMS+bje/jA==}
     engines: {node: '>=6'}
 
+  esm-env-robust@0.0.3:
+    resolution: {integrity: sha512-90Gnuw2DALOqlL1581VxP3GHPUNHX9U+fQ+8FNcTTFClhY5gEggAAnJ3q1b2Oq23knRsjv8YpNeMRPaMLUymOA==}
+
   esm-env@1.2.2:
     resolution: {integrity: sha512-Epxrv+Nr/CaL4ZcFGPJIYLWFom+YeV1DqMLHJoEd9SYRxNbaFruBwfEX/kkHUJf55j2+TUbmDcmuilbP1TmXHA==}
 
@@ -842,6 +848,11 @@ packages:
     peerDependencies:
       svelte: ^4.0.0 || ^5.0.0-next.0
       typescript: '>=5.0.0'
+
+  svelte-splitpanes@8.0.9:
+    resolution: {integrity: sha512-L3oLXTC99M191FInTXJ/f/2i0welRql1QuVbPaU8iy6nvCR6X9VyjHCsCpLqKGWHwqkWo/AM9CQ1c0nzlb+MkA==}
+    peerDependencies:
+      svelte: ^4.2.19 || ^5.1.0
 
   svelte@5.35.6:
     resolution: {integrity: sha512-p7PVLQYrvCxJuxzGfOv/l71hVuHC6EZk5UDjbt/bndMYaBcUV5sFjDsj+PSIYvz1vcfbG6inX83/xIUeik1xGA==}
@@ -1372,6 +1383,10 @@ snapshots:
 
   escalade@3.2.0: {}
 
+  esm-env-robust@0.0.3:
+    dependencies:
+      esm-env: 1.2.2
+
   esm-env@1.2.2: {}
 
   esrap@2.1.0:
@@ -1546,6 +1561,11 @@ snapshots:
       typescript: 5.6.3
     transitivePeerDependencies:
       - picomatch
+
+  svelte-splitpanes@8.0.9(svelte@5.35.6):
+    dependencies:
+      esm-env-robust: 0.0.3
+      svelte: 5.35.6
 
   svelte@5.35.6:
     dependencies:
