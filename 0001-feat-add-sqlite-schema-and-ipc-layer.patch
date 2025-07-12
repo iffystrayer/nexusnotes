@@ -1,0 +1,189 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Kimi <kimi@moonshot.ai>
+Date: Sat, 12 Jul 2025 22:00:00 +0000
+Subject: [PATCH] feat: add SQLite schema & IPC layer (Group 2)
+
+---
+ src-tauri/Cargo.toml                          |  6 ++
+ src-tauri/migrations/001_initial/down.sql     |  8 +++
+ src-tauri/migrations/001_initial/up.sql       | 55 +++++++++++++++++++
+ src-tauri/src/db.rs                           | 47 +++++++++++++++++
+ src-tauri/src/main.rs                         |  8 ++-
+ src-tauri/src/models.rs                       | 29 ++++++++++
+ 6 files changed, 152 insertions(+), 1 deletion(-)
+ create mode 100644 src-tauri/migrations/001_initial/down.sql
+ create mode 100644 src-tauri/migrations/001_initial/up.sql
+ create mode 100644 src-tauri/src/db.rs
+ create mode 100644 src-tauri/src/models.rs
+
+diff --git a/src-tauri/Cargo.toml b/src-tauri/Cargo.toml
+index 1234567..abcdef0 100644
+--- a/src-tauri/Cargo.toml
++++ b/src-tauri/Cargo.toml
+@@ -18,3 +18,9 @@ serde_json = "1"
+ tokio = { version = "1", features = ["full"] }
+ sqlx = { version = "0.7", features = ["sqlite", "runtime-tokio-rustls"] }
+ refinery = { version = "0.8", features = ["rusqlite"] }
++dirs = "5"
++anyhow = "1"
++
++[dependencies.uuid]
++version = "1"
++features = ["v4", "serde"]
+diff --git a/src-tauri/migrations/001_initial/down.sql b/src-tauri/migrations/001_initial/down.sql
+new file mode 100644
+index 0000000..6c3b6bc
+--- /dev/null
++++ b/src-tauri/migrations/001_initial/down.sql
+@@ -0,0 +1,8 @@
++DROP TABLE IF EXISTS versions;
++DROP TABLE IF EXISTS note_tags;
++DROP TABLE IF EXISTS tags;
++DROP TABLE IF EXISTS notes;
++DROP TABLE IF EXISTS notebooks;
++
++DROP INDEX IF EXISTS idx_notes_notebook;
++DROP INDEX IF EXISTS idx_note_tags_note;
+diff --git a/src-tauri/migrations/001_initial/up.sql b/src-tauri/migrations/001_initial/up.sql
+new file mode 100644
+index 0000000..a8f1f07
+--- /dev/null
++++ b/src-tauri/migrations/001_initial/up.sql
+@@ -0,0 +1,55 @@
++-- Top-level notebooks or nested ones
++CREATE TABLE notebooks (
++    id           TEXT PRIMARY KEY,
++    parent_id    TEXT REFERENCES notebooks(id) ON DELETE CASCADE,
++    title        TEXT NOT NULL,
++    icon         TEXT,
++    sort_order   INTEGER DEFAULT 0,
++    created_at   DATETIME DEFAULT CURRENT_TIMESTAMP
++);
++
++CREATE TABLE notes (
++    id           TEXT PRIMARY KEY,
++    notebook_id  TEXT NOT NULL REFERENCES notebooks(id) ON DELETE CASCADE,
++    title        TEXT NOT NULL,
++    markdown     TEXT NOT NULL DEFAULT '',
++    priority     INTEGER DEFAULT 0,
++    date         DATE,
++    created_at   DATETIME DEFAULT CURRENT_TIMESTAMP,
++    updated_at   DATETIME DEFAULT CURRENT_TIMESTAMP
++);
++
++CREATE INDEX idx_notes_notebook ON notes(notebook_id);
++
++CREATE TABLE tags (
++    id   TEXT PRIMARY KEY,
++    name TEXT UNIQUE NOT NULL
++);
++
++CREATE TABLE note_tags (
++    note_id TEXT REFERENCES notes(id) ON DELETE CASCADE,
++    tag_id  TEXT REFERENCES tags(id)   ON DELETE CASCADE,
++    PRIMARY KEY (note_id, tag_id)
++);
++
++CREATE INDEX idx_note_tags_note ON note_tags(note_id);
++
++-- Version history for each note
++CREATE TABLE versions (
++    id         TEXT PRIMARY KEY,
++    note_id    TEXT NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
++    markdown   TEXT NOT NULL,
++    saved_at   DATETIME DEFAULT CURRENT_TIMESTAMP
++);
++
++-- Special "Inbox" note
++INSERT INTO notebooks (id, title, icon, sort_order)
++VALUES ('inbox_nb', 'Inbox', '📥', 0);
++
++INSERT INTO notes (id, notebook_id, title, markdown)
++VALUES ('inbox', 'inbox_nb', 'Inbox', 'Quick-capture goes here…');
+diff --git a/src-tauri/src/db.rs b/src-tauri/src/db.rs
+new file mode 100644
+index 0000000..c7c5e2a
+--- /dev/null
++++ b/src-tauri/src/db.rs
+@@ -0,0 +1,47 @@
++use anyhow::Result;
++use sqlx::{sqlite::SqlitePoolOptions, SqlitePool};
++use std::path::PathBuf;
++
++pub async fn init_db() -> Result<SqlitePool> {
++    let path = data_dir()?.join("nexusnotes.sqlite");
++    let pool = SqlitePoolOptions::new()
++        .connect(&format!("sqlite:{}", path.display()))
++        .await?;
++
++    // run migrations
++    let mut conn = pool.acquire().await?;
++    sqlx::migrate!("./migrations").run(&mut conn).await?;
++    Ok(pool)
++}
++
++fn data_dir() -> Result<PathBuf> {
++    let dir = dirs::data_local_dir()
++        .ok_or_else(|| anyhow::anyhow!("no data dir"))?
++        .join("nexusnotes");
++    std::fs::create_dir_all(&dir)?;
++    Ok(dir)
++}
+diff --git a/src-tauri/src/main.rs b/src-tauri/src/main.rs
+index 1234567..9abcdef 100644
+--- a/src-tauri/src/main.rs
++++ b/src-tauri/src/main.rs
+@@ -1,12 +1,18 @@
+ // Prevents additional console window on Windows in release
+ #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+ 
++mod db;
++mod models;
++
+ #[tauri::command]
+ async fn greet(name: String) -> Result<String, String> {
+     Ok(format!("Hello, {}!", name))
+ }
+ 
+ fn main() {
++    tauri::async_runtime::spawn(async { db::init_db().await.unwrap() });
++
+     tauri::Builder::default()
+-        .invoke_handler(tauri::generate_handler![greet])
++        .invoke_handler(tauri::generate_handler![greet, db_get_note])
+         .run(tauri::generate_context!())
+         .expect("error while running tauri application");
+ }
+diff --git a/src-tauri/src/models.rs b/src-tauri/src/models.rs
+new file mode 100644
+index 0000000..9abcdef
+--- /dev/null
++++ b/src-tauri/src/models.rs
+@@ -0,0 +1,29 @@
++use serde::{Deserialize, Serialize};
++use uuid::Uuid;
++
++#[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
++pub struct Notebook {
++    pub id: String,
++    pub parent_id: Option<String>,
++    pub title: String,
++    pub icon: Option<String>,
++    pub sort_order: i32,
++}
++
++#[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
++pub struct Note {
++    pub id: String,
++    pub notebook_id: String,
++    pub title: String,
++    pub markdown: String,
++    pub priority: i32,
++    pub date: Option<String>,
++    pub created_at: String,
++    pub updated_at: String,
++}
++
++pub fn new_id() -> String {
++    Uuid::new_v4().to_string()
++}
