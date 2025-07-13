@@ -57,7 +57,7 @@
   }
 </script>
 
-<li class="list-none group" role="treeitem" aria-expanded={children().length > 0}>
+<li class="list-none group" role="treeitem" aria-expanded={children().length > 0} aria-selected="false">
   <div
     class="flex items-center space-x-2 rounded px-2 py-1 text-sm
            hover:bg-indigo-100 dark:hover:bg-indigo-700/40 cursor-pointer transition-colors"
@@ -100,9 +100,16 @@
     {:else}
       <span 
         class="flex-1 select-none cursor-pointer text-gray-800 dark:text-gray-200" 
-        role="text"
-        aria-label="{node.title}"
+        role="button"
+        tabindex="0"
+        aria-label="{node.title} - double click to edit"
         on:dblclick={() => editing = true}
+        on:keydown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            editing = true;
+          }
+        }}
       >
         {node.title}
       </span>
