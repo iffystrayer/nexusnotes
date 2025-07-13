@@ -57,7 +57,7 @@
         class="flex-1 bg-transparent outline-none"
       />
     {:else}
-      <span class="flex-1 select-none" on:dblclick={() => editing = true}>{node.title}</span>
+      <span class="flex-1 select-none cursor-pointer" role="button" tabindex="0" on:dblclick={() => editing = true} on:keydown={(e) => e.key === 'Enter' && (editing = true)}>{node.title}</span>
     {/if}
 
     <button on:click={addChild} class="opacity-0 group-hover:opacity-100 text-xs" title="Add child">+</button>
