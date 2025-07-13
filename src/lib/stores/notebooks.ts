@@ -14,7 +14,9 @@ export const notebooks = writable<Notebook[]>([]);
 // Load on startup
 export async function loadNotebooks() {
   try {
+    console.log('Loading notebooks...');
     const data: Notebook[] = await invoke('get_notebooks');
+    console.log('Loaded notebooks:', data);
     notebooks.set(data);
   } catch (error) {
     console.error('Failed to load notebooks:', error);
@@ -23,9 +25,11 @@ export async function loadNotebooks() {
 
 export async function createNotebook(title: string, parentId: string | null = null) {
   try {
+    console.log('Creating notebook:', title, 'parent:', parentId);
     const nb: Notebook = await invoke('create_notebook', {
       payload: { title, parent_id: parentId, icon: '📁' }
     });
+    console.log('Created notebook:', nb);
     notebooks.update(list => [...list, nb]);
   } catch (error) {
     console.error('Failed to create notebook:', error);

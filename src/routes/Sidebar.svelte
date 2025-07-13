@@ -6,9 +6,16 @@
 
   onMount(loadNotebooks);
 
+  // Debug: log notebooks when they change
+  $: console.log('Notebooks in sidebar:', $notebooks);
+
   function addRootNotebook() {
+    console.log('Add root notebook clicked');
     const title = prompt('New notebook name:');
-    if (title) createNotebook(title);
+    if (title) {
+      console.log('Creating notebook with title:', title);
+      createNotebook(title);
+    }
   }
 
   async function handleDrop(draggedId: string, ontoId: string) {
@@ -37,6 +44,11 @@
   <ul class="flex-1 overflow-y-auto p-2 space-y-1" role="tree" aria-label="Notebook tree">
     {#each $notebooks.filter(n => !n.parent_id) as root (root.id)}
       <TreeNode node={root} depth={0} onDrop={handleDrop} />
+    {:else}
+      <li class="text-gray-500 text-sm p-2 text-center">
+        No notebooks yet.<br>
+        Click the + button to create one!
+      </li>
     {/each}
   </ul>
 </aside>
