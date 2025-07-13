@@ -27,31 +27,52 @@
   }
 
   function addChild() {
+    console.log('AddChild clicked for:', node.title);
     const title = prompt('Notebook name:');
-    if (title) createNotebook(title, node.id);
+    console.log('User entered title:', title);
+    if (title) {
+      console.log('Creating child notebook:', title, 'parent:', node.id);
+      createNotebook(title, node.id);
+    }
   }
 
   async function addNote() {
+    console.log('AddNote clicked for:', node.title);
     const title = prompt('Note title:');
+    console.log('User entered note title:', title);
     if (title) {
       try {
+        console.log('Creating note:', title, 'in notebook:', node.id);
         await createNote(node.id, title);
+        console.log('Note created successfully');
       } catch (error) {
-        alert('Failed to create note');
+        console.error('Failed to create note:', error);
+        alert('Failed to create note: ' + error);
       }
     }
   }
 
   async function remove() {
+    console.log('Remove clicked for:', node.title);
     if (confirm(`Delete "${node.title}" and all its children?`)) {
-      await deleteNotebook(node.id);
+      console.log('User confirmed deletion');
+      try {
+        await deleteNotebook(node.id);
+        console.log('Notebook deleted successfully');
+      } catch (error) {
+        console.error('Failed to delete notebook:', error);
+        alert('Failed to delete notebook: ' + error);
+      }
     }
   }
 
   function handleDropzone(e: DragEvent) {
+    console.log('Drop event on:', node.title);
     e.preventDefault();
     const draggedId = e.dataTransfer?.getData('text/plain');
+    console.log('Dragged ID:', draggedId, 'Target ID:', node.id);
     if (draggedId && draggedId !== node.id) {
+      console.log('Calling onDrop with:', draggedId, 'onto:', node.id);
       onDrop(draggedId, node.id);
     }
   }
@@ -66,7 +87,10 @@
     role="button"
     tabindex="0"
     aria-label="{node.title} - {children().length > 0 ? 'expandable folder' : 'folder'}"
-    on:dragstart={(e) => e.dataTransfer?.setData('text/plain', node.id)}
+    on:dragstart={(e) => {
+      console.log('Drag started for:', node.title, 'ID:', node.id);
+      e.dataTransfer?.setData('text/plain', node.id);
+    }}
     on:drop={handleDropzone}
     on:dragover={(e) => e.preventDefault()}
     on:keydown={(e) => {

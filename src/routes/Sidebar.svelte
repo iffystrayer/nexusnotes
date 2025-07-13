@@ -19,7 +19,14 @@
   }
 
   async function handleDrop(draggedId: string, ontoId: string) {
-    await moveNotebook(draggedId, ontoId);
+    console.log('Sidebar handleDrop called with:', draggedId, 'onto:', ontoId);
+    try {
+      await moveNotebook(draggedId, ontoId);
+      console.log('Move completed successfully');
+    } catch (error) {
+      console.error('Move failed:', error);
+      alert('Failed to move notebook: ' + error);
+    }
   }
 </script>
 

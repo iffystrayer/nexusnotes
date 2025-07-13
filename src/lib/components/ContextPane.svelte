@@ -1,12 +1,17 @@
 <script lang="ts">
   import { Sun, Moon } from 'lucide-svelte';
   import { toggleTheme } from '$lib/stores/theme';
+  
+  function handleThemeToggle() {
+    console.log('Theme toggle button clicked');
+    toggleTheme();
+  }
 </script>
 
 <aside class="w-72 flex flex-col bg-gray-50 dark:bg-gray-900 border-l border-gray-200 dark:border-gray-700">
   <header class="flex items-center justify-between p-3 border-b">
     <span class="font-semibold text-sm">Context</span>
-    <button on:click={toggleTheme} class="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700">
+    <button on:click={handleThemeToggle} class="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700">
       <Sun class="h-5 w-5 dark:hidden" /> <Moon class="h-5 w-5 hidden dark:block" />
     </button>
   </header>
