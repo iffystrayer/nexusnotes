@@ -1,0 +1,360 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: NexusNotes <build@nexusnotes.ai>
+Date: Sun, 13 Jul 2025 00:30:00 +0000
+Subject: [PATCH] feat: draggable nexus tree with live SQLite persistence
+
+---
+ src-tauri/src/main.rs                         |  10 +-
+ src-tauri/src/notebooks.rs                    | 111 ++++++++++++++++++
+ src/lib/components/Sidebar.svelte             |  40 -------
+ src/lib/components/TreeNode.svelte            |  88 ++++++++++++++
+ src/lib/stores/notebooks.ts                   |  68 +++++++++++
+ src/routes/+page.svelte                       |   2 +-
+ src/routes/Sidebar.svelte                     |  44 +++++++
+ 7 files changed, 321 insertions(+), 42 deletions(-)
+ create mode 100644 src-tauri/src/notebooks.rs
+ delete mode 100644 src/lib/components/Sidebar.svelte
+ create mode 100644 src/lib/components/TreeNode.svelte
+ create mode 100644 src/lib/stores/notebooks.ts
+ create mode 100644 src/routes/Sidebar.svelte
+
+diff --git a/src-tauri/src/main.rs b/src-tauri/src/main.rs
+index 9abcdef..e123456 100644
+--- a/src-tauri/src/main.rs
++++ b/src-tauri/src/main.rs
+@@ -1,6 +1,7 @@
+ #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+ mod db;
+ mod models;
++mod notebooks;
+ 
+ #[tauri::command]
+ async fn greet(name: String) -> Result<String, String> {
+@@ -11,8 +12,15 @@ fn main() {
+     tauri::async_runtime::spawn(async { db::init_db().await.unwrap() });
+ 
+     tauri::Builder::default()
+-        .invoke_handler(tauri::generate_handler![greet, db_get_note])
++        .invoke_handler(tauri::generate_handler![
++            greet,
++            notebooks::get_notebooks,
++            notebooks::create_notebook,
++            notebooks::delete_notebook,
++            notebooks::rename_notebook,
++            notebooks::move_notebook
++        ])
+         .run(tauri::generate_context!())
+         .expect("error while running tauri application");
+ }
+diff --git a/src-tauri/src/notebooks.rs b/src-tauri/src/notebooks.rs
+new file mode 100644
+index 0000000..0abcdef
+--- /dev/null
++++ b/src-tauri/src/notebooks.rs
+@@ -0,0 +1,111 @@
++use crate::db::init_db;
++use crate::models::{new_id, Notebook};
++use serde::{Deserialize, Serialize};
++
++#[derive(Serialize, Deserialize)]
++pub struct NotebookPayload {
++    id: Option<String>,
++    parent_id: Option<String>,
++    title: String,
++    icon: Option<String>,
++}
++
++#[tauri::command]
++pub async fn get_notebooks() -> Result<Vec<Notebook>, String> {
++    let pool = init_db().await.map_err(|e| e.to_string())?;
++    let rows = sqlx::query_as!(
++        Notebook,
++        "SELECT id, parent_id, title, icon, sort_order FROM notebooks ORDER BY sort_order, created_at"
++    )
++    .fetch_all(&pool)
++    .await
++    .map_err(|e| e.to_string())?;
++    Ok(rows)
++}
++
++#[tauri::command]
++pub async fn create_notebook(payload: NotebookPayload) -> Result<Notebook, String> {
++    let pool = init_db().await.map_err(|e| e.to_string())?;
++    let id = payload.id.unwrap_or_else(new_id);
++    sqlx::query!(
++        "INSERT INTO notebooks (id, parent_id, title, icon, sort_order)
++         VALUES ($1, $2, $3, $4, (SELECT COALESCE(MAX(sort_order),0)+1 FROM notebooks WHERE parent_id = $2))",
++        id,
++        payload.parent_id,
++        payload.title,
++        payload.icon
++    )
++    .execute(&pool)
++    .await
++    .map_err(|e| e.to_string())?;
++    Ok(Notebook {
++        id,
++        parent_id: payload.parent_id,
++        title: payload.title,
++        icon: payload.icon,
++        sort_order: 0, // will be refreshed on next fetch
++    })
++}
++
++#[tauri::command]
++pub async fn rename_notebook(id: String, title: String) -> Result<(), String> {
++    let pool = init_db().await.map_err(|e| e.to_string())?;
++    sqlx::query!(
++        "UPDATE notebooks SET title = $1 WHERE id = $2",
++        title,
++        id
++    )
++    .execute(&pool)
++    .await
++    .map_err(|e| e.to_string())?;
++    Ok(())
++}
++
++#[tauri::command]
++pub async fn delete_notebook(id: String) -> Result<(), String> {
++    let pool = init_db().await.map_err(|e| e.to_string())?;
++    // cascades via ON DELETE CASCADE
++    sqlx::query!("DELETE FROM notebooks WHERE id = $1", id)
++        .execute(&pool)
++        .await
++        .map_err(|e| e.to_string())?;
++    Ok(())
++}
++
++#[tauri::command]
++pub async fn move_notebook(id: String, new_parent_id: Option<String>) -> Result<(), String> {
++    let pool = init_db().await.map_err(|e| e.to_string())?;
++    sqlx::query!(
++        "UPDATE notebooks SET parent_id = $1 WHERE id = $2",
++        new_parent_id,
++        id
++    )
++    .execute(&pool)
++    .await
++    .map_err(|e| e.to_string())?;
++    Ok(())
++}
+diff --git a/src/lib/components/Sidebar.svelte b/src/lib/components/Sidebar.svelte
+deleted file mode 100644
+index 5a3b5c2..0000000
+--- a/src/lib/components/Sidebar.svelte
++++ /dev/null
+@@ -1,40 +0,0 @@
+-<script lang="ts">
+-  import { Bars3Icon } from '@heroicons/svelte/24/outline';
+-  import { sidebarWidth } from '$lib/stores/ui';
+-
+-  const toggle = () => sidebarWidth.update(w => (w === 0 ? 256 : 0));
+-</script>
+-
+-<aside
+-  class="bg-gray-100 dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700
+-         transition-all duration-200 ease-in-out"
+-  style="width: {$sidebarWidth}px"
+->
+-  <header class="flex items-center justify-between p-3 border-b">
+-    <span class="font-bold text-sm">Nexus Tree</span>
+-    <button on:click={toggle} class="lg:hidden">
+-      <Bars3Icon class="h-5 w-5" />
+-    </button>
+-  </header>
+-
+-  <nav class="p-2 space-y-1">
+-    <!-- Placeholder tree nodes -->
+-    <div class="px-2 py-1 text-sm rounded hover:bg-gray-200 dark:hover:bg-gray-800 cursor-pointer">
+-      📁 Personal
+-    </div>
+-    <div class="px-2 py-1 ml-4 text-sm rounded hover:bg-gray-200 dark:hover:bg-gray-800 cursor-pointer">
+-      📝 Untitled
+-    </div>
+-  </nav>
+-</aside>
+diff --git a/src/lib/components/TreeNode.svelte b/src/lib/components/TreeNode.svelte
+new file mode 100644
+index 0000000..5b5c2dd
+--- /dev/null
++++ b/src/lib/components/TreeNode.svelte
+@@ -0,0 +1,88 @@
++<script lang="ts">
++  import { dndzone } from 'svelte-dnd-action';
++  import { flip } from 'svelte/animate';
++  import { notebooks, moveNotebook, createNotebook, renameNotebook, deleteNotebook } from '$lib/stores/notebooks';
++  import type { Notebook } from '$lib/stores/notebooks';
++
++  export let node: Notebook;
++  export let depth: number = 0;
++
++  let editing = false;
++  let newTitle = node.title;
++
++  const children = () => $notebooks.filter(n => n.parent_id === node.id);
++
++  function handleDrag(e: CustomEvent<{ info: any; items: Notebook[] }>) {
++    const { items } = e.detail;
++    // items is the reordered list; find new parent
++    moveNotebook(node.id, items.find(i => i.id !== node.id)?.parent_id ?? null);
++  }
++
++  function commitRename() {
++    if (newTitle.trim()) renameNotebook(node.id, newTitle.trim());
++    editing = false;
++  }
++
++  function addChild() {
++    const title = prompt('Notebook name:');
++    if (title) createNotebook(title, node.id);
++  }
++
++  function remove() {
++    if (confirm(`Delete “${node.title}” and all its children?`)) deleteNotebook(node.id);
++  }
++</script>
++
++<li
++  class="list-none"
++  use:dndzone={{ items: children(), flipDurationMs: 200 }}
++  on:consider={handleDrag}
++  on:finalize={handleDrag}
++>
++  <div
++    class="flex items-center space-x-1 rounded px-2 py-1 text-sm
++           hover:bg-gray-200 dark:hover:bg-gray-700 cursor-pointer"
++    style:padding-left="{12 + depth * 16}px"
++  >
++    <span class="w-4 text-center">
++      {node.icon || '📁'}
++    </span>
++
++    {#if editing}
++      <input
++        type="text"
++        bind:value={newTitle}
++        on:blur={commitRename}
++        on:keydown={(e) => e.key === 'Enter' && commitRename()}
++        class="flex-1 bg-transparent outline-none"
++      />
++    {:else}
++      <span class="flex-1 select-none">{node.title}</span>
++    {/if}
++
++    <button on:click={addChild} class="opacity-0 group-hover:opacity-100 text-xs">+</button>
++    <button on:click={remove} class="opacity-0 group-hover:opacity-100 text-xs">🗑</button>
++  </div>
++
++  {#if children().length}
++    <ul class="mt-1">
++      {#each children() as child (child.id)}
++        <svelte:self node={child} depth={depth + 1} />
++      {/each}
++    </ul>
++  {/if}
++</li>
+diff --git a/src/lib/stores/notebooks.ts b/src/lib/stores/notebooks.ts
+new file mode 100644
+index 0000000..7634f4a
+--- /dev/null
++++ b/src/lib/stores/notebooks.ts
+@@ -0,0 +1,68 @@
++import { invoke } from '@tauri-apps/api/tauri';
++import { writable } from 'svelte/store';
++
++export interface Notebook {
++  id: string;
++  parent_id: string | null;
++  title: string;
++  icon?: string;
++  sort_order: number;
++}
++
++export const notebooks = writable<Notebook[]>([]);
++
++// Load on startup
++export async function loadNotebooks() {
++  const data: Notebook[] = await invoke('get_notebooks');
++  notebooks.set(data);
++}
++
++export async function createNotebook(title: string, parentId: string | null = null) {
++  const nb: Notebook = await invoke('create_notebook', {
++    payload: { title, parent_id: parentId, icon: '📁' }
++  });
++  notebooks.update(list => [...list, nb]);
++}
++
++export async function renameNotebook(id: string, title: string) {
++  await invoke('rename_notebook', { id, title });
++  notebooks.update(list =>
++    list.map(n => (n.id === id ? { ...n, title } : n))
++  );
++}
++
++export async function deleteNotebook(id: string) {
++  await invoke('delete_notebook', { id });
++  notebooks.update(list => list.filter(n => n.id !== id && !list.some(c => c.parent_id === id)));
++}
++
++export async function moveNotebook(id: string, newParentId: string | null) {
++  await invoke('move_notebook', { id, new_parent_id: newParentId });
++  loadNotebooks(); // refresh
++}
+diff --git a/src/routes/+page.svelte b/src/routes/+page.svelte
+index c7f0f21..1b8c4c5 100644
+--- a/src/routes/+page.svelte
++++ b/src/routes/+page.svelte
+@@ -1,7 +1,7 @@
+ <script lang="ts">
+-  import Sidebar from '$lib/components/Sidebar.svelte';
+   import EditorPane from '$lib/components/EditorPane.svelte';
+   import ContextPane from '$lib/components/ContextPane.svelte';
++  import Sidebar from './Sidebar.svelte';
+   import { Pane, Splitpanes } from 'svelte-splitpanes';
+ </script>
+ 
+diff --git a/src/routes/Sidebar.svelte b/src/routes/Sidebar.svelte
+new file mode 100644
+index 0000000..e4b3f3e
+--- /dev/null
++++ b/src/routes/Sidebar.svelte
+@@ -0,0 +1,44 @@
++<script lang="ts">
++  import { onMount } from 'svelte';
++  import { loadNotebooks, notebooks, createNotebook } from '$lib/stores/notebooks';
++  import TreeNode from '$lib/components/TreeNode.svelte';
++  import { PlusIcon } from '@heroicons/svelte/24/outline';
++
++  onMount(loadNotebooks);
++
++  function addRootNotebook() {
++    const title = prompt('New notebook name:');
++    if (title) createNotebook(title);
++  }
++</script>
++
++<aside
++  class="bg-gray-100 dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700
++         w-64 flex flex-col"
++>
++  <header
++    class="flex items-center justify-between p-3 border-b border-gray-200 dark:border-gray-700"
++  >
++    <span class="font-bold text-sm">Nexus Tree</span>
++    <button
++      on:click={addRootNotebook}
++      class="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700"
++      title="Add root notebook"
++    >
++      <PlusIcon class="h-5 w-5" />
++    </button>
++  </header>
++
++  <ul class="flex-1 overflow-y-auto p-2">
++    {#each $notebooks.filter(n => !n.parent_id) as root (root.id)}
++      <TreeNode node={root} depth={0} />
++    {/each}
++  </ul>
++</aside>

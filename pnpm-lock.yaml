@@ -17,6 +17,9 @@ importers:
       lucide-svelte:
         specifier: ^0.525.0
         version: 0.525.0(svelte@5.35.6)
+      svelte-dnd-action:
+        specifier: ^0.9.63
+        version: 0.9.63(svelte@5.35.6)
     devDependencies:
       '@sveltejs/adapter-static':
         specifier: ^3.0.6
@@ -857,6 +860,11 @@ packages:
       svelte: ^4.0.0 || ^5.0.0-next.0
       typescript: '>=5.0.0'
 
+  svelte-dnd-action@0.9.63:
+    resolution: {integrity: sha512-nYbLmLeUlqbg8LG4OygItFPWkkESs9J34MkRp5VhFe4EKNJTWZnw3rDRBl3lmt+cmFIuy3l8lKCw2vDehvUzWQ==}
+    peerDependencies:
+      svelte: '>=3.23.0 || ^5.0.0-next.0'
+
   svelte-splitpanes@8.0.9:
     resolution: {integrity: sha512-L3oLXTC99M191FInTXJ/f/2i0welRql1QuVbPaU8iy6nvCR6X9VyjHCsCpLqKGWHwqkWo/AM9CQ1c0nzlb+MkA==}
     peerDependencies:
@@ -1573,6 +1581,10 @@ snapshots:
       typescript: 5.6.3
     transitivePeerDependencies:
       - picomatch
+
+  svelte-dnd-action@0.9.63(svelte@5.35.6):
+    dependencies:
+      svelte: 5.35.6
 
   svelte-splitpanes@8.0.9(svelte@5.35.6):
     dependencies:
