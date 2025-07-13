@@ -1,5 +1,5 @@
 <script lang="ts">
-  import Sidebar from '$lib/components/Sidebar.svelte';
+  import Sidebar from './Sidebar.svelte';
   import EditorPane from '$lib/components/EditorPane.svelte';
   import ContextPane from '$lib/components/ContextPane.svelte';
   import { Pane, Splitpanes } from 'svelte-splitpanes';
