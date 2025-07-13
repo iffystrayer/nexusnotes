@@ -34,7 +34,7 @@
     </button>
   </header>
 
-  <ul class="flex-1 overflow-y-auto p-2 space-y-1">
+  <ul class="flex-1 overflow-y-auto p-2 space-y-1" role="tree" aria-label="Notebook tree">
     {#each $notebooks.filter(n => !n.parent_id) as root (root.id)}
       <TreeNode node={root} depth={0} onDrop={handleDrop} />
     {/each}
