@@ -38,6 +38,7 @@ export async function renameNotebook(id: string, title: string) {
     notebooks.update(list =>
       list.map(n => (n.id === id ? { ...n, title } : n))
     );
+    await loadNotebooks(); // refresh to get accurate data
   } catch (error) {
     console.error('Failed to rename notebook:', error);
   }
@@ -55,7 +56,7 @@ export async function deleteNotebook(id: string) {
 export async function moveNotebook(id: string, newParentId: string | null) {
   try {
     await invoke('move_notebook', { id, new_parent_id: newParentId });
-    loadNotebooks(); // refresh
+    await loadNotebooks(); // refresh
   } catch (error) {
     console.error('Failed to move notebook:', error);
   }

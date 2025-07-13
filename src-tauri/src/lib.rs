@@ -2,6 +2,7 @@
 mod db;
 mod models;
 mod notebooks;
+mod notes;
 
 #[tauri::command]
 fn greet(name: &str) -> String {
@@ -24,7 +25,11 @@ pub fn run() {
             notebooks::create_notebook,
             notebooks::delete_notebook,
             notebooks::rename_notebook,
-            notebooks::move_notebook
+            notebooks::move_notebook,
+            notes::get_notes,
+            notes::create_note,
+            notes::update_note,
+            notes::delete_note
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
