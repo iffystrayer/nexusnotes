@@ -4,6 +4,9 @@ mod models;
 mod notebooks;
 mod notes;
 
+#[cfg(test)]
+mod notes_test;
+
 #[tauri::command]
 fn greet(name: &str) -> String {
     format!("Hello, {}! You've been greeted from Rust!", name)
@@ -29,7 +32,13 @@ pub fn run() {
             notes::get_notes,
             notes::create_note,
             notes::update_note,
-            notes::delete_note
+            notes::delete_note,
+            notes::get_tags_for_note,
+            notes::add_tag_to_note,
+            notes::remove_tag_from_note,
+            notes::get_all_tags,
+            notes::search_notes_and_notebooks,
+            notes::get_backlinks
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

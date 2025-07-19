@@ -24,6 +24,9 @@ pub async fn get_notebooks() -> Result<Vec<Notebook>, String> {
 
 #[tauri::command]
 pub async fn create_notebook(payload: NotebookPayload) -> Result<Notebook, String> {
+    if payload.title.trim().is_empty() {
+        return Err("Notebook title cannot be empty.".into());
+    }
     let pool = init_db().await.map_err(|e| e.to_string())?;
     let id = payload.id.unwrap_or_else(new_id);
     sqlx::query(
@@ -37,17 +40,24 @@ pub async fn create_notebook(payload: NotebookPayload) -> Result<Notebook, Strin
     .execute(&pool)
     .await
     .map_err(|e| e.to_string())?;
-    Ok(Notebook {
-        id,
-        parent_id: payload.parent_id,
-        title: payload.title,
-        icon: payload.icon,
-        sort_order: 0, // will be refreshed on next fetch
-    })
+
+    // Fetch the newly created notebook to get accurate sort_order
+    let notebook = sqlx::query_as::<_, Notebook>(
+        "SELECT id, parent_id, title, icon, sort_order FROM notebooks WHERE id = $1"
+    )
+    .bind(&id)
+    .fetch_one(&pool)
+    .await
+    .map_err(|e| e.to_string())?;
+    
+    Ok(notebook)
 }
 
 #[tauri::command]
 pub async fn rename_notebook(id: String, title: String) -> Result<(), String> {
+    if title.trim().is_empty() {
+        return Err("Notebook title cannot be empty.".into());
+    }
     let pool = init_db().await.map_err(|e| e.to_string())?;
     sqlx::query("UPDATE notebooks SET title = $1 WHERE id = $2")
         .bind(&title)

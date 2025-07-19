@@ -14,12 +14,14 @@ export interface Note {
 
 export const notes = writable<Note[]>([]);
 
+import { addNotification } from './ui';
+
 export async function loadNotes(notebookId: string) {
   try {
     const data: Note[] = await invoke('get_notes', { notebook_id: notebookId });
     notes.set(data);
   } catch (error) {
-    console.error('Failed to load notes:', error);
+    addNotification({ message: `Failed to load notes: ${error}`, type: 'error', timeout: 5000 });
   }
 }
 
@@ -29,21 +31,23 @@ export async function createNote(notebookId: string, title: string, markdown: st
       payload: { title, notebook_id: notebookId, markdown }
     });
     notes.update(list => [note, ...list]);
+    addNotification({ message: `Note "${title}" created successfully!`, type: 'success', timeout: 3000 });
     return note;
   } catch (error) {
-    console.error('Failed to create note:', error);
+    addNotification({ message: `Failed to create note: ${error}`, type: 'error', timeout: 5000 });
     throw error;
   }
 }
 
-export async function updateNote(id: string, title: string, markdown: string) {
+export async function updateNote(id: string, title: string, markdown: string, priority: number, date?: string) {
   try {
-    await invoke('update_note', { id, title, markdown });
+    await invoke('update_note', { id, title, markdown, priority, date });
     notes.update(list =>
-      list.map(n => (n.id === id ? { ...n, title, markdown } : n))
+      list.map(n => (n.id === id ? { ...n, title, markdown, priority, date } : n))
     );
+    addNotification({ message: `Note "${title}" updated successfully!`, type: 'success', timeout: 3000 });
   } catch (error) {
-    console.error('Failed to update note:', error);
+    addNotification({ message: `Failed to update note: ${error}`, type: 'error', timeout: 5000 });
   }
 }
 
@@ -51,7 +55,8 @@ export async function deleteNote(id: string) {
   try {
     await invoke('delete_note', { id });
     notes.update(list => list.filter(n => n.id !== id));
+    addNotification({ message: `Note deleted successfully!`, type: 'success', timeout: 3000 });
   } catch (error) {
-    console.error('Failed to delete note:', error);
+    addNotification({ message: `Failed to delete note: ${error}`, type: 'error', timeout: 5000 });
   }
 }

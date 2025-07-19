@@ -1,6 +1,7 @@
 <script lang="ts">
   import { notebooks, moveNotebook, createNotebook, renameNotebook, deleteNotebook } from '$lib/stores/notebooks';
-  import { createNote } from '$lib/stores/notes';
+  import { createNote, loadNotes, notes } from '$lib/stores/notes';
+  import { selectedNoteId } from '$lib/stores/ui';
   import type { Notebook } from '$lib/stores/notebooks';
   import { Plus, Edit, Trash2 } from 'lucide-svelte';
 
@@ -26,43 +27,39 @@
     editing = false;
   }
 
+import { addNotification } from '$lib/stores/ui';
+
   function addChild() {
-    console.log('AddChild clicked for:', node.title);
     const title = prompt('Notebook name:');
-    console.log('User entered title:', title);
     if (title) {
-      console.log('Creating child notebook:', title, 'parent:', node.id);
       createNotebook(title, node.id);
+    } else {
+      addNotification({ message: 'Child notebook creation cancelled.', type: 'info', timeout: 3000 });
     }
   }
 
   async function addNote() {
-    console.log('AddNote clicked for:', node.title);
-    const title = prompt('Note title:');
-    console.log('User entered note title:', title);
+    const title = "Test Note " + Date.now(); // Hardcode for testing
     if (title) {
       try {
-        console.log('Creating note:', title, 'in notebook:', node.id);
         await createNote(node.id, title);
-        console.log('Note created successfully');
       } catch (error) {
-        console.error('Failed to create note:', error);
-        alert('Failed to create note: ' + error);
+        addNotification({ message: `Failed to create note: ${error}`, type: 'error', timeout: 5000 });
       }
+    } else {
+      addNotification({ message: 'Note creation cancelled.', type: 'info', timeout: 3000 });
     }
   }
 
   async function remove() {
-    console.log('Remove clicked for:', node.title);
     if (confirm(`Delete "${node.title}" and all its children?`)) {
-      console.log('User confirmed deletion');
       try {
         await deleteNotebook(node.id);
-        console.log('Notebook deleted successfully');
       } catch (error) {
-        console.error('Failed to delete notebook:', error);
-        alert('Failed to delete notebook: ' + error);
+        addNotification({ message: `Failed to delete notebook: ${error}`, type: 'error', timeout: 5000 });
       }
+    } else {
+      addNotification({ message: 'Notebook deletion cancelled.', type: 'info', timeout: 3000 });
     }
   }
 
@@ -80,7 +77,7 @@
 
 <li class="list-none group" role="treeitem" aria-expanded={children().length > 0} aria-selected="false">
   <div
-    class="flex items-center space-x-2 rounded px-2 py-1 text-sm
+    class="flex items-center space-x-3 rounded px-2 py-1 text-sm
            hover:bg-indigo-100 dark:hover:bg-indigo-700/40 cursor-pointer transition-colors"
     style:padding-left="{12 + depth * 16}px"
     draggable="true"
@@ -122,12 +119,19 @@
         use:focus
       />
     {:else}
-      <span 
-        class="flex-1 select-none cursor-pointer text-gray-800 dark:text-gray-200" 
+      <span
+        class="flex-1 select-none cursor-pointer text-gray-800 dark:text-gray-200"
         role="button"
         tabindex="0"
         aria-label="{node.title} - double click to edit"
         on:dblclick={() => editing = true}
+        on:click={async () => {
+          // Load notes for this notebook and select the first one
+          await loadNotes(node.id);
+          if ($notes.length > 0) {
+            selectedNoteId.set($notes[0].id);
+          }
+        }}
         on:keydown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
@@ -139,30 +143,30 @@
       </span>
     {/if}
 
-    <div class="flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity" role="toolbar" aria-label="Notebook actions">
-      <button 
-        on:click={addChild} 
+    <div class="flex space-x-2 opacity-0 group-hover:opacity-100 transition-opacity" role="toolbar" aria-label="Notebook actions">
+      <button
+        on:click={addChild}
         class="p-1 rounded hover:bg-indigo-200 dark:hover:bg-indigo-600 text-indigo-600 dark:text-indigo-300"
         title="Add child notebook to {node.title}"
         aria-label="Add child notebook to {node.title}"
       >
-        <Plus class="h-3 w-3" aria-hidden="true" />
+        <Plus class="h-4 w-4" aria-hidden="true" />
       </button>
-      <button 
-        on:click={addNote} 
+      <button
+        on:click={addNote}
         class="p-1 rounded hover:bg-green-200 dark:hover:bg-green-600 text-green-600 dark:text-green-300"
         title="Add note to {node.title}"
         aria-label="Add note to {node.title}"
       >
-        <Edit class="h-3 w-3" aria-hidden="true" />
+        <Edit class="h-4 w-4" aria-hidden="true" />
       </button>
-      <button 
-        on:click={remove} 
+      <button
+        on:click={remove}
         class="p-1 rounded hover:bg-red-200 dark:hover:bg-red-600 text-red-600 dark:text-red-300"
         title="Delete {node.title}"
         aria-label="Delete {node.title}"
       >
-        <Trash2 class="h-3 w-3" aria-hidden="true" />
+        <Trash2 class="h-4 w-4" aria-hidden="true" />
       </button>
     </div>
   </div>

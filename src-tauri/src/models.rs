@@ -22,6 +22,19 @@ pub struct Note {
     pub updated_at: String,
 }
 
+#[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
+pub struct Tag {
+    pub id: String,
+    pub name: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(untagged)] // This allows deserialization without a tag field
+pub enum SearchResult {
+    Note(Note),
+    Notebook(Notebook),
+}
+
 pub fn new_id() -> String {
     Uuid::new_v4().to_string()
 }
